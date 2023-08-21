@@ -11,6 +11,7 @@
 #include "BatteryInterface.h"
 #include "DisplayAbstract.h"
 #include "wifiHandlerInterface.h"
+#include "IRTxInterface.h"
 #include "Notification.hpp"
 
 class HardwareAbstract {
