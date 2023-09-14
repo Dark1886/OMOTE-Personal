@@ -1,8 +1,8 @@
 #include "wifihandler.hpp"
+#include "HardwareAbstract.hpp"
+
 #include <Arduino.h>
 #include <Preferences.h>
-#include "HardwareAbstract.hpp"
-#include "WiFi.h"
 
 std::shared_ptr<wifiHandler> wifiHandler::mInstance = nullptr;
 
@@ -77,7 +77,8 @@ std::shared_ptr<wifiHandler> wifiHandler::getInstance()
     return mInstance;
 };
 
-wifiHandler::wifiHandler()
+wifiHandler::wifiHandler():
+  mMqttClient(mWifiClient)
 {
     this->password = "";
     this->SSID = "";
@@ -227,4 +228,23 @@ bool wifiHandler::isConnected()
 std::string wifiHandler::getIP()
 {
     return std::string(WiFi.localIP().toString().c_str());
+}
+
+void wifiHandler::mqttSend(std::string aTopic, std::string aMessage){
+  if(mMqttClient.connected() || mMqttClient.connect(MQTT_CLIENT_NAME)){
+    mMqttClient.publish(aTopic.c_str(),aMessage.c_str());
+    return;
+  }else{
+    Serial.println("Failed to Send MQTT due to Connection Failure");
+  }
+}
+
+void wifiHandler::setupMqttBroker(std::string aBrokerIpAddress, int aPort){
+  mMqttClient.setServer(aBrokerIpAddress.c_str(),aPort);
+  if(!mMqttClient.connect(MQTT_CLIENT_NAME)){
+    Serial.print("Failed to Connect to MQTT Server at:");
+    Serial.print(aBrokerIpAddress.c_str());
+    Serial.print("  Port:");
+    Serial.println(aPort);
+  };
 }

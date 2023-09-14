@@ -16,10 +16,16 @@ typedef struct {
 
 class wifiHandlerInterface{
     public:
+        virtual ~wifiHandlerInterface(){};
+
         virtual bool isAvailable() = 0;
         virtual void scan() = 0;
         virtual void connect(std::shared_ptr<std::string> ssid, std::shared_ptr<std::string> password) = 0;
         virtual void onScanDone(std::function<void (std::shared_ptr<std::vector<WifiInfo>>)> function) = 0;
         virtual void onStatusUpdate(std::function<void (std::shared_ptr<wifiStatus>)> function) = 0;
         virtual void begin() = 0;
+
+        // MQTT Interface
+        virtual void setupMqttBroker(std::string aBrokerIpAddress, int aPort) = 0;
+        virtual void mqttSend(std::string aTopic, std::string aMessage) = 0;
 };

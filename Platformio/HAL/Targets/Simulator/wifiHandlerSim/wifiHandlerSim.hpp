@@ -6,6 +6,7 @@
 class wifiHandlerSim: public wifiHandlerInterface {
     public:
         wifiHandlerSim();
+        ~wifiHandlerSim() override = default;
         static std::shared_ptr<wifiHandlerSim> getInstance();
 
         
@@ -29,6 +30,10 @@ class wifiHandlerSim: public wifiHandlerInterface {
         void begin();
         void onScanDone(std::function<void (std::shared_ptr<std::vector<WifiInfo>>)> function);
         void onStatusUpdate(std::function<void (std::shared_ptr<wifiStatus>)> function);
+        
+        static constexpr auto MQTT_CLIENT_NAME = "OMOTE_SIM";
+        void setupMqttBroker(std::string aBrokerIpAddress, int aPort = 1883) override;
+        void mqttSend(std::string aTopic, std::string aMessage) override;
     private:
         Notification<std::shared_ptr<std::vector<WifiInfo>>> scan_notification;
         Notification<std::shared_ptr<wifiStatus>> status_update;

@@ -2,6 +2,8 @@
 #include "wifiHandlerInterface.h"
 #include "Notification.hpp"
 #include "memory.h"
+#include <PubSubClient.h>
+#include <WiFiClient.h>
 #include <WiFi.h>
 
 #define STRING_SIZE 50
@@ -9,6 +11,7 @@
 class wifiHandler: public wifiHandlerInterface {
     public:
         wifiHandler();
+        ~wifiHandler() override{};
         static std::shared_ptr<wifiHandler> getInstance();
         /**
          * @brief Function to initialize the wifi handler 
@@ -36,7 +39,9 @@ class wifiHandler: public wifiHandlerInterface {
         void onScanDone(std::function<void (std::shared_ptr<std::vector<WifiInfo>>)> function);
         void onStatusUpdate(std::function<void (std::shared_ptr<wifiStatus>)> function);
 
-
+        static constexpr auto MQTT_CLIENT_NAME = "OMOTE";
+        void setupMqttBroker(std::string aBrokerIpAddress, int aPort = 1883) override;
+        void mqttSend(std::string aTopic, std::string aMessage) override;
     private:
 
         Notification<std::shared_ptr<std::vector<WifiInfo>>> scan_notification;
@@ -64,6 +69,8 @@ class wifiHandler: public wifiHandlerInterface {
          * @return String IP Address of the device
          */
         std::string getIP();
+        WiFiClient mWifiClient;
+        PubSubClient mMqttClient;
         wifiStatus wifi_status;
         static std::shared_ptr<wifiHandler> mInstance;
         bool connect_attempt = false;
@@ -95,5 +102,6 @@ class wifiHandler: public wifiHandlerInterface {
          * 
          */
         std::string SSID;
+        std::string mqttBrokerIp;
 
 };

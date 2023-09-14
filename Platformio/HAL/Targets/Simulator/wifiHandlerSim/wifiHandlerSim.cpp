@@ -59,6 +59,14 @@ bool wifiHandlerSim::isAvailable(){
     return false;
 }
 
+void wifiHandlerSim::setupMqttBroker(std::string aBrokerIpAddress, int aPort) {
+
+};
+
+void wifiHandlerSim::mqttSend(std::string aTopic, std::string aMessage) {
+
+};
+
 void wifiHandlerSim::onScanDone(std::function<void (std::shared_ptr<std::vector<WifiInfo>>)> function){
     this->scan_notification.onNotify(std::move(function));
 }
