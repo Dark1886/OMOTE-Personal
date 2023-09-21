@@ -15,6 +15,7 @@
 #include <Adafruit_FT6206.h>
 #include "driver/ledc.h"
 #include <PubSubClient.h>
+#include <HARestAPI.h>
 
 #define ENABLE_WIFI // Comment out to diable connected features
 
@@ -132,6 +133,7 @@ Preferences preferences;
 lv_obj_t* WifiLabel;
 WiFiClient espClient;
 PubSubClient client(espClient);
+HARestAPI ha(espClient);
 
 // Helper Functions -----------------------------------------------------------------------------------------------------------------------
 
@@ -164,12 +166,6 @@ static void virtualKeypad_event_cb(lv_event_t* e) {
   IrSender.sendRC5(IrSender.encodeRC5X(0x00, virtualKeyMapTechnisat[(int)target->user_data]));
 }
 
-// Apple Key Event handler
-static void appleKey_event_cb(lv_event_t* e) {
-  // Send IR command based on the event user data  
-  IrSender.sendSony(50 + (int)e->user_data, 15);
-  Serial.println(50 + (int)e->user_data);
-}
 
 // Wakeup by IMU Switch Event handler
 static void WakeEnableSetting_event_cb(lv_event_t * e){
@@ -179,12 +175,18 @@ static void WakeEnableSetting_event_cb(lv_event_t * e){
 // Smart Home Toggle Event handler
 static void smartHomeToggle_event_cb(lv_event_t * e){
   char payload[8];
-  if(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED)) strcpy(payload,"true");
-  else strcpy(payload,"false");
+  if(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED)) strcpy(payload,"on");
+  else strcpy(payload,"off");
   // Publish an MQTT message based on the event user data  
-  if((int)e->user_data == 1) client.publish("bulb1_set", payload);
-  if((int)e->user_data == 2) client.publish("bulb2_set", payload);
+  if((int)e->user_data == 1) client.publish("cmnd/tasmota_S31/Power1", payload);
 }
+
+// Smart Home Toggle Event handler
+static void HAToggle_event_cb(lv_event_t * e){
+  ha.setURL("/api/services/switch/toggle");
+  ha.sendHAComponent("switch.tasmota");
+}
+
 
 // Smart Home Toggle Event handler
 static void smartHomeSlider_event_cb(lv_event_t * e){
@@ -507,7 +509,15 @@ void setup() {
   // Setup touchscreen
   Wire.begin(SDA, SCL, 400000); // Configure i2c pins and set frequency to 400kHz
   touch.begin(128); // Initialize touchscreen and set sensitivity threshold
-  
+
+  //setup HARestAPI
+  const char* ha_ip = "192.168.0.213";
+  uint16_t ha_port = 8123;
+  //long-lived password. On HA, Profile > Long-Lived Access Tokens > Create Token
+  const char* ha_pwd = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1NzMzNzBhYWQ2MDc0MjEyOWE3YjgyOGFjYjRkNThkYSIsImlhdCI6MTY5NTE2NjA3MywiZXhwIjoyMDEwNTI2MDczfQ.I-8vMjTcoObMHyx4Y0y1TNEh9JIIvlmFlR8Xt5FyGUo"; 
+  ha.setHAServer(ha_ip, ha_port);
+  ha.setHAPassword(ha_pwd);
+
   // Setup LVGL
   lv_init();
   lv_disp_draw_buf_init( &draw_buf, bufA, bufB, screenWidth * screenHeight / 10 );
@@ -540,95 +550,13 @@ void setup() {
   lv_obj_set_size(tabview, screenWidth, 270); // 270 = screenHeight(320) - panel(30) - statusbar(20)
   lv_obj_align(tabview, LV_ALIGN_TOP_MID, 0, 20);
 
-  // Add 4 tabs (names are irrelevant since the labels are hidden)
+  // Add 1 tabs (names are irrelevant since the labels are hidden)
   lv_obj_t* tab1 = lv_tabview_add_tab(tabview, "Settings");
-  lv_obj_t* tab2 = lv_tabview_add_tab(tabview, "Technisat");
-  lv_obj_t* tab3 = lv_tabview_add_tab(tabview, "Apple TV");
-  lv_obj_t* tab4 = lv_tabview_add_tab(tabview, "Smart Home");
+  lv_obj_t* tab2 = lv_tabview_add_tab(tabview, "Smart Home");
 
   // Configure number button grid 
   static lv_coord_t col_dsc[] = { LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST }; // equal x distribution
   static lv_coord_t row_dsc[] = { 52, 52, 52, 52, LV_GRID_TEMPLATE_LAST }; // manual y distribution to compress the grid a bit
-
-  // Create a container with grid for tab2
-  lv_obj_set_style_pad_all(tab2, 0, LV_PART_MAIN);
-  lv_obj_t* cont = lv_obj_create(tab2);
-  lv_obj_set_style_shadow_width(cont, 0, LV_PART_MAIN);
-  lv_obj_set_style_bg_color(cont, lv_color_black(), LV_PART_MAIN);
-  lv_obj_set_style_border_width(cont, 0, LV_PART_MAIN);
-  lv_obj_set_style_grid_column_dsc_array(cont, col_dsc, 0);
-  lv_obj_set_style_grid_row_dsc_array(cont, row_dsc, 0);
-  lv_obj_set_size(cont, 240, 270);
-  lv_obj_set_layout(cont, LV_LAYOUT_GRID);
-  lv_obj_align(cont, LV_ALIGN_TOP_MID, 0, 0);
-  lv_obj_set_style_radius(cont, 0, LV_PART_MAIN);
-
-  lv_obj_t* buttonLabel;
-  lv_obj_t* obj;
-
-  // Iterate through grid buttons configure them
-  for (int i = 0; i < 12; i++) {
-    uint8_t col = i % 3;
-    uint8_t row = i / 3;
-    // Create the button object
-    if ((row == 3) && ((col == 0) || (col == 2))) continue; // Do not create a complete fourth row, only a 0 button
-    obj = lv_btn_create(cont);
-    lv_obj_set_grid_cell(obj, LV_GRID_ALIGN_STRETCH, col, 1, LV_GRID_ALIGN_STRETCH, row, 1);
-    lv_obj_set_style_bg_color(obj, color_primary, LV_PART_MAIN);
-    lv_obj_set_style_radius(obj, 14, LV_PART_MAIN);
-    lv_obj_set_style_shadow_color(obj, lv_color_hex(0x404040), LV_PART_MAIN);
-    lv_obj_add_flag(obj, LV_OBJ_FLAG_EVENT_BUBBLE); // Clicking a button causes a event in its container
-    // Create Labels for each button
-    buttonLabel = lv_label_create(obj);        
-    if(i < 9){
-      lv_label_set_text_fmt(buttonLabel, std::to_string(i+1).c_str(), col, row);
-      lv_obj_set_user_data(obj, (void*)i); // Add user data so we can identify which button caused the container event
-    }
-    else{
-      lv_label_set_text_fmt(buttonLabel, "0", col, row);
-      lv_obj_set_user_data(obj, (void*)9);
-    } 
-    lv_obj_set_style_text_font(buttonLabel, &lv_font_montserrat_24, LV_PART_MAIN);
-    lv_obj_center(buttonLabel);
-  }
-  // Create a shared event for all button inside container
-  lv_obj_add_event_cb(cont, virtualKeypad_event_cb, LV_EVENT_CLICKED, NULL);
-  
-
-  // Add content to the Apple TV tab (3)
-  // Add a nice apple tv logo
-  lv_obj_t* appleImg = lv_img_create(tab3);
-  lv_img_set_src(appleImg, &appleTvIcon);
-  lv_obj_align(appleImg, LV_ALIGN_CENTER, 0, -60);
-  // create two buttons and add their icons accordingly
-  lv_obj_t* button = lv_btn_create(tab3);
-  lv_obj_align(button, LV_ALIGN_BOTTOM_LEFT, 10, 0);
-  lv_obj_set_size(button, 60, 60);
-  lv_obj_set_style_radius(button, 30, LV_PART_MAIN);
-  lv_obj_set_style_bg_color(button, color_primary, LV_PART_MAIN);
-  lv_obj_add_event_cb(button, appleKey_event_cb, LV_EVENT_CLICKED, (void*)1);
-
-  appleImg = lv_img_create(button);
-  lv_img_set_src(appleImg, &appleBackIcon);
-  lv_obj_set_style_img_recolor(appleImg, lv_color_white(), LV_PART_MAIN);
-  lv_obj_set_style_img_recolor_opa(appleImg, LV_OPA_COVER, LV_PART_MAIN);
-  lv_obj_align(appleImg, LV_ALIGN_CENTER, -3, 0);
-
-  button = lv_btn_create(tab3);
-  lv_obj_align(button, LV_ALIGN_BOTTOM_RIGHT, -10, 0);
-  lv_obj_set_size(button, 60, 60);
-  lv_obj_set_style_radius(button, 30, LV_PART_MAIN);
-  lv_obj_set_style_bg_color(button, color_primary, LV_PART_MAIN);
-  lv_obj_add_event_cb(button, appleKey_event_cb, LV_EVENT_CLICKED, (void*)2);
-
-  appleImg = lv_img_create(button);
-  lv_img_set_src(appleImg, &appleDisplayIcon);
-  lv_obj_set_style_img_recolor(appleImg, lv_color_white(), LV_PART_MAIN);
-  lv_obj_set_style_img_recolor_opa(appleImg, LV_OPA_COVER, LV_PART_MAIN);
-  lv_obj_align(appleImg, LV_ALIGN_CENTER, 0, 0);
-  
-
-
 
   // Add content to the settings tab
   // With a flex layout, setting groups/boxes will position themselves automatically
@@ -724,16 +652,16 @@ void setup() {
 
 
 
-  // Add content to the smart home tab (4)
-  lv_obj_set_layout(tab4, LV_LAYOUT_FLEX);
-  lv_obj_set_flex_flow(tab4, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_scrollbar_mode(tab4, LV_SCROLLBAR_MODE_ACTIVE);
+  // Add content to the smart home tab (2)
+  lv_obj_set_layout(tab2, LV_LAYOUT_FLEX);
+  lv_obj_set_flex_flow(tab2, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_scrollbar_mode(tab2, LV_SCROLLBAR_MODE_ACTIVE);
 
   // Add a label, then a box for the light controls
-  menuLabel = lv_label_create(tab4);
+  menuLabel = lv_label_create(tab2);
   lv_label_set_text(menuLabel, "Living Room");
 
-  menuBox = lv_obj_create(tab4);
+  menuBox = lv_obj_create(tab2);
   lv_obj_set_size(menuBox, lv_pct(100), 79);
   lv_obj_set_style_bg_color(menuBox, color_primary, LV_PART_MAIN);
   lv_obj_set_style_border_width(menuBox, 0, LV_PART_MAIN);
@@ -768,7 +696,7 @@ void setup() {
   lv_obj_add_event_cb(slider, smartHomeSlider_event_cb, LV_EVENT_VALUE_CHANGED, (void*)1);
 
   // Add another menu box for a second appliance
-  menuBox = lv_obj_create(tab4);
+  menuBox = lv_obj_create(tab2);
   lv_obj_set_size(menuBox, lv_pct(100), 79);
   lv_obj_set_style_bg_color(menuBox, color_primary, LV_PART_MAIN);
   lv_obj_set_style_border_width(menuBox, 0, LV_PART_MAIN);
@@ -787,7 +715,7 @@ void setup() {
   lv_obj_align(lightToggleB, LV_ALIGN_TOP_RIGHT, 0, 0);
   lv_obj_set_style_bg_color(lightToggleB, lv_color_lighten(color_primary, 50), LV_PART_MAIN);
   lv_obj_set_style_bg_color(lightToggleB, color_primary, LV_PART_INDICATOR);
-  lv_obj_add_event_cb(lightToggleB, smartHomeToggle_event_cb, LV_EVENT_VALUE_CHANGED, (void*)2);
+  lv_obj_add_event_cb(lightToggleB, HAToggle_event_cb, LV_EVENT_VALUE_CHANGED, (void*)2);
 
   slider = lv_slider_create(menuBox);
   lv_slider_set_range(slider, 0, 100);
@@ -801,16 +729,6 @@ void setup() {
   lv_obj_set_size(slider, lv_pct(90), 10);
   lv_obj_align(slider, LV_ALIGN_TOP_MID, 0, 37);
   lv_obj_add_event_cb(slider, smartHomeSlider_event_cb, LV_EVENT_VALUE_CHANGED, (void*)2);
-
-
-  // Add another room (empty for now)
-  menuLabel = lv_label_create(tab4);
-  lv_label_set_text(menuLabel, "Kitchen");
-
-  menuBox = lv_obj_create(tab4);
-  lv_obj_set_size(menuBox, lv_pct(100), 79);
-  lv_obj_set_style_bg_color(menuBox, color_primary, LV_PART_MAIN);
-  lv_obj_set_style_border_width(menuBox, 0, LV_PART_MAIN);
 
 
   // Set current page according to the current Device
@@ -835,24 +753,6 @@ void setup() {
   lv_obj_set_size(btn, 150, lv_pct(100));
   lv_obj_t* label = lv_label_create(btn);
   lv_label_set_text_fmt(label, "Settings");
-  lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
-  lv_obj_set_style_bg_color(btn, color_primary, LV_PART_MAIN);
-
-  btn = lv_btn_create(panel);
-  lv_obj_clear_flag(btn, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_set_size(btn, 150, lv_pct(100));
-  label = lv_label_create(btn);
-  lv_label_set_text_fmt(label, "Technisat");
-  lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
-  lv_obj_set_style_bg_color(btn, color_primary, LV_PART_MAIN);
-
-  btn = lv_btn_create(panel);
-  lv_obj_clear_flag(btn, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_set_size(btn, 150, lv_pct(100));
-  label = lv_label_create(btn);
-  lv_label_set_text_fmt(label, "Apple TV");
   lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
   lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
   lv_obj_set_style_bg_color(btn, color_primary, LV_PART_MAIN);
@@ -1035,9 +935,5 @@ void loop() {
   //  //tft.drawString(String(results.command) + "        ", 80, 90, 1);
   //  IrReceiver.resume(); // Enable receiving of the next value
   //}
-
-  
-  
-
 
 }
