@@ -127,9 +127,9 @@ byte wakeup_reason;
 enum Wakeup_reasons{WAKEUP_BY_RESET, WAKEUP_BY_IMU, WAKEUP_BY_KEYPAD};
 Preferences preferences;
 
-#define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
-#define MQTT_SERVER "YOUR_MQTT_SERVER_IP"
+#define WIFI_SSID "553E"
+#define WIFI_PASSWORD "Steelpanther"
+#define MQTT_SERVER "192.168.1.213"
 lv_obj_t* WifiLabel;
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -511,7 +511,7 @@ void setup() {
   touch.begin(128); // Initialize touchscreen and set sensitivity threshold
 
   //setup HARestAPI
-  const char* ha_ip = "192.168.0.213";
+  const char* ha_ip = "192.168.1.213";
   uint16_t ha_port = 8123;
   //long-lived password. On HA, Profile > Long-Lived Access Tokens > Create Token
   const char* ha_pwd = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1NzMzNzBhYWQ2MDc0MjEyOWE3YjgyOGFjYjRkNThkYSIsImlhdCI6MTY5NTE2NjA3MywiZXhwIjoyMDEwNTI2MDczfQ.I-8vMjTcoObMHyx4Y0y1TNEh9JIIvlmFlR8Xt5FyGUo"; 
