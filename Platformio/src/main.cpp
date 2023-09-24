@@ -178,13 +178,27 @@ static void smartHomeToggle_event_cb(lv_event_t * e){
   if(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED)) strcpy(payload,"on");
   else strcpy(payload,"off");
   // Publish an MQTT message based on the event user data  
-  if((int)e->user_data == 1) client.publish("cmnd/tasmota_S31/Power1", payload);
+  client.publish("cmnd/tasmota_S31/Power1", payload);
 }
 
 // Smart Home Toggle Event handler
-static void HAToggle_event_cb(lv_event_t * e){
-  ha.setURL("/api/services/switch/toggle");
-  ha.sendHAComponent("switch.tasmota");
+static void HAToggle_event(String deviceType, String targetDevice){
+  ha.setURL("/api/services/" + deviceType + "/toggle");
+   ha.sendHAComponent(targetDevice);
+}
+
+// Smart Home Denon Volume Up
+static void HAToggle_Denon_Up_cb(){
+  ha.setURL("/api/services/script/1686595169151");
+  //ha.sendHAComponent("switch.tasmota");
+  ha.sendHA();
+}
+
+// Smart Home Denon Volume Up
+static void HAToggle_Denon_Down_cb(){
+  ha.setURL("/api/services/script/1686595153473");
+  ha.sendHA();
+  //ha.sendHAComponent("switch.tasmota");
 }
 
 
@@ -680,7 +694,7 @@ void setup() {
   lv_obj_align(lightToggleA, LV_ALIGN_TOP_RIGHT, 0, 0);
   lv_obj_set_style_bg_color(lightToggleA, lv_color_lighten(color_primary, 50), LV_PART_MAIN);
   lv_obj_set_style_bg_color(lightToggleA, color_primary, LV_PART_INDICATOR);
-  lv_obj_add_event_cb(lightToggleA, smartHomeToggle_event_cb, LV_EVENT_VALUE_CHANGED, (void*)1);
+  lv_obj_add_event_cb(lightToggleA, smartHomeToggle_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
   slider = lv_slider_create(menuBox);
   lv_slider_set_range(slider, 0, 100);
@@ -715,7 +729,7 @@ void setup() {
   lv_obj_align(lightToggleB, LV_ALIGN_TOP_RIGHT, 0, 0);
   lv_obj_set_style_bg_color(lightToggleB, lv_color_lighten(color_primary, 50), LV_PART_MAIN);
   lv_obj_set_style_bg_color(lightToggleB, color_primary, LV_PART_INDICATOR);
-  lv_obj_add_event_cb(lightToggleB, HAToggle_event_cb, LV_EVENT_VALUE_CHANGED, (void*)2);
+  lv_obj_add_event_cb(lightToggleB, smartHomeToggle_event_cb, LV_EVENT_VALUE_CHANGED, (void*)2);
 
   slider = lv_slider_create(menuBox);
   lv_slider_set_range(slider, 0, 100);
@@ -921,10 +935,23 @@ void loop() {
     if(customKeypad.key[i].kstate == PRESSED || customKeypad.key[i].kstate == HOLD){
       standbyTimer = SLEEP_TIMEOUT; // Reset the sleep timer when a button is pressed
       int keyCode = customKeypad.key[i].kcode;
-      Serial.println(customKeypad.key[i].kchar);
+      Serial.println(customKeypad.key[i].kchar);\
+      if(customKeypad.key[i].kchar == '+'){
+        Serial.println("Sending + to Home Assistant");
+        //HAToggle_event("input_boolean", "input_boolean.helperswitch");
+        HAToggle_Denon_Up_cb();
+      }
+      else if (customKeypad.key[i].kchar == '-'){
+        Serial.println("Sending - to Home Assistant");
+        HAToggle_Denon_Down_cb();
+      }
       // Send IR codes depending on the current device (tabview page)
-      if(currentDevice == 1) IrSender.sendRC5(IrSender.encodeRC5X(0x00, keyMapTechnisat[keyCode/ROWS][keyCode%ROWS]));
-      else if(currentDevice == 2) IrSender.sendSony((keyCode/ROWS)*(keyCode%ROWS), 15);
+
+      //if(currentDevice == 1) IrSender.sendRC5(IrSender.encodeRC5X(0x00, keyMapTechnisat[keyCode/ROWS][keyCode%ROWS]));
+      //else if(currentDevice == 2) IrSender.sendSony((keyCode/ROWS)*(keyCode%ROWS), 15);
+      //Serial.println("Key Map Technisat" + keyMapTechnisat[keyMapTechnisat[keyCode/ROWS][keyCode%ROWS]]);
+
+      
     }
   }
 
