@@ -16,8 +16,15 @@
 #include "driver/ledc.h"
 #include <PubSubClient.h>
 #include <HARestAPI.h>
+#include <ArduinoOTA.h>
+#include <BleGamepad.h>
 
+//#define OTA_Update // Comment out to disable OTA updates
 #define ENABLE_WIFI // Comment out to diable connected features
+#define IREnable // Comment out to diable IR features
+#define BTKeypad //comment out to disable BTKeypad
+
+
 
 // Pin assignment -----------------------------------------------------------------------------------------------------------------------
 
@@ -58,6 +65,9 @@
 int battery_voltage = 0;
 int battery_percentage = 100;
 bool battery_ischarging = false;
+
+// timer variables 
+uint64_t lastEvent = 0;
 
 // IMU declarations
 int motion = 0;
@@ -119,8 +129,10 @@ byte virtualKeyMapTechnisat[10] = {0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 
 byte currentDevice = 1; // Current Device to control (allows switching mappings between devices)
 
 // IR declarations
-IRsend IrSender(IR_LED, true);
-IRrecv IrReceiver(IR_RX);
+#ifdef IREnable
+  IRsend IrSender(IR_LED, true);
+  IRrecv IrReceiver(IR_RX);
+#endif
 
 // Other declarations
 byte wakeup_reason;
@@ -129,11 +141,16 @@ Preferences preferences;
 
 #define WIFI_SSID "553E"
 #define WIFI_PASSWORD "Steelpanther"
-#define MQTT_SERVER "192.168.1.213"
+#define MQTT_SERVER "192.168.1.10"
 lv_obj_t* WifiLabel;
 WiFiClient espClient;
 PubSubClient client(espClient);
 HARestAPI ha(espClient);
+
+#ifdef BTKeypad
+  //create bluetooth gamepad
+  BleGamepad bleGamepad;
+#endif
 
 // Helper Functions -----------------------------------------------------------------------------------------------------------------------
 
@@ -156,6 +173,7 @@ static void bl_slider_event_cb(lv_event_t * e){
   backlight_brightness = constrain(lv_slider_get_value(slider), 60, 255);
 }
 
+#ifdef IREnable
 // Virtual Keypad Event handler
 static void virtualKeypad_event_cb(lv_event_t* e) {
   lv_obj_t* target = lv_event_get_target(e);
@@ -165,6 +183,7 @@ static void virtualKeypad_event_cb(lv_event_t* e) {
   // Send IR command based on the button user data  
   IrSender.sendRC5(IrSender.encodeRC5X(0x00, virtualKeyMapTechnisat[(int)target->user_data]));
 }
+#endif
 
 
 // Wakeup by IMU Switch Event handler
@@ -189,19 +208,39 @@ static void HAToggle_event(String deviceType, String targetDevice){
 
 // Smart Home Denon Volume Up
 static void HAToggle_Denon_Up_cb(){
-  ha.setURL("/api/services/script/1686595169151");
-  //ha.sendHAComponent("switch.tasmota");
+  ha.setURL("/api/services/script/VolumeUp");
   ha.sendHA();
 }
 
 // Smart Home Denon Volume Up
 static void HAToggle_Denon_Down_cb(){
-  ha.setURL("/api/services/script/1686595153473");
+  ha.setURL("/api/services/script/VolumeDown");
   ha.sendHA();
-  //ha.sendHAComponent("switch.tasmota");
 }
 
-
+static void keyPadPress(char key, KeyState state) {
+  switch (key) {
+    case '+': 
+      Serial.println("Sending + to Home Assistant");
+      HAToggle_Denon_Up_cb();
+      break;
+    case '-': 
+      Serial.println("Sending - to Home Assistant");
+      HAToggle_Denon_Down_cb();
+      break;
+    case 'u': 
+      Serial.println("Sending UP through Bluetooth");
+      // Up
+      #ifdef BTKeypad
+      bleGamepad.setHat1(HAT_UP);
+      delay( 5 );
+      bleGamepad.setHat1(HAT_CENTERED);
+      #endif
+      break;
+    default:
+      break;
+    }
+}
 // Smart Home Toggle Event handler
 static void smartHomeSlider_event_cb(lv_event_t * e){
   lv_obj_t * slider = lv_event_get_target(e);
@@ -525,7 +564,7 @@ void setup() {
   touch.begin(128); // Initialize touchscreen and set sensitivity threshold
 
   //setup HARestAPI
-  const char* ha_ip = "192.168.1.213";
+  const char* ha_ip = "192.168.1.10";
   uint16_t ha_port = 8123;
   //long-lived password. On HA, Profile > Long-Lived Access Tokens > Create Token
   const char* ha_pwd = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1NzMzNzBhYWQ2MDc0MjEyOWE3YjgyOGFjYjRkNThkYSIsImlhdCI6MTY5NTE2NjA3MywiZXhwIjoyMDEwNTI2MDczfQ.I-8vMjTcoObMHyx4Y0y1TNEh9JIIvlmFlR8Xt5FyGUo"; 
@@ -722,7 +761,7 @@ void setup() {
   lv_obj_align(bulbIcon, LV_ALIGN_TOP_LEFT, 0, 0);
 
   menuLabel = lv_label_create(menuBox);
-  lv_label_set_text(menuLabel, "Ceiling Light");
+  lv_label_set_text(menuLabel, "TBD");
   lv_obj_align(menuLabel, LV_ALIGN_TOP_LEFT, 22, 3);
   lv_obj_t* lightToggleB = lv_switch_create(menuBox);
   lv_obj_set_size(lightToggleB, 40, 22);
@@ -860,15 +899,60 @@ void setup() {
   uint8_t intDataRead;
   IMU.readRegister(&intDataRead, LIS3DH_INT1_SRC);//clear interrupt
   
-  // Setup IR
-  IrSender.begin();
-  digitalWrite(IR_VCC, HIGH); // Turn on IR receiver
-  IrReceiver.enableIRIn();  // Start the receiver
-
+  #ifdef IREnable
+    // Setup IR
+    IrSender.begin();
+    digitalWrite(IR_VCC, HIGH); // Turn on IR receiver
+    IrReceiver.enableIRIn();  // Start the receiver
+  #endif
 
   lv_timer_handler(); // Run the LVGL UI once before the loop takes over
 
+  
+  #ifdef OTA_Update
+    Serial.println("Beginning OTA init");
+    ArduinoOTA
+      .onStart([]() {
+        String type;
+        if (ArduinoOTA.getCommand() == U_FLASH)
+          type = "sketch";
+        else // U_SPIFFS
+          type = "filesystem";
 
+        // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+        Serial.println("Start updating " + type);
+      })
+      .onEnd([]() {
+        Serial.println("\nEnd");
+      })
+      .onProgress([](unsigned int progress, unsigned int total) {
+        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+      })
+      .onError([](ota_error_t error) {
+        Serial.printf("Error[%u]: ", error);
+        if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+        else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+        else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+        else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+        else if (error == OTA_END_ERROR) Serial.println("End Failed");
+      });
+
+    ArduinoOTA.begin();
+  #endif
+
+  #ifdef BTKeypad
+    //setup Bluetooth ability
+    BleGamepadConfiguration bleGamepadConfig;
+    bleGamepadConfig.setAutoReport(true);
+    bleGamepadConfig.setControllerType(CONTROLLER_TYPE_GAMEPAD);
+    bleGamepadConfig.setIncludeStart(true);
+    bleGamepadConfig.setIncludeSelect(true);
+    bleGamepadConfig.setIncludeMenu(true);
+    bleGamepadConfig.setIncludeHome(true);
+    bleGamepadConfig.setIncludeBack(true);
+
+    bleGamepad.begin(&bleGamepadConfig);
+  #endif
   Serial.print("Setup finised in ");
   Serial.print(millis());
   Serial.println("ms.");
@@ -878,7 +962,10 @@ void setup() {
 // Loop ------------------------------------------------------------------------------------------------------------------------------------
 
 void loop() { 
-
+  #ifdef OTA_Update
+    ArduinoOTA.handle();
+  #endif
+  
   // Update Backlight brightness
   static int fadeInTimer = millis(); // fadeInTimer = time after setup
   if(millis() < fadeInTimer + backlight_brightness){ // Fade in the backlight brightness
@@ -935,23 +1022,34 @@ void loop() {
     if(customKeypad.key[i].kstate == PRESSED || customKeypad.key[i].kstate == HOLD){
       standbyTimer = SLEEP_TIMEOUT; // Reset the sleep timer when a button is pressed
       int keyCode = customKeypad.key[i].kcode;
-      Serial.println(customKeypad.key[i].kchar);\
-      if(customKeypad.key[i].kchar == '+'){
-        Serial.println("Sending + to Home Assistant");
-        //HAToggle_event("input_boolean", "input_boolean.helperswitch");
-        HAToggle_Denon_Up_cb();
-      }
-      else if (customKeypad.key[i].kchar == '-'){
-        Serial.println("Sending - to Home Assistant");
-        HAToggle_Denon_Down_cb();
-      }
-      // Send IR codes depending on the current device (tabview page)
+      Serial.println(customKeypad.key[i].kchar);
+      Serial.println(customKeypad.key[i].kstate);
+      keyPadPress(customKeypad.key[i].kchar, customKeypad.key[i].kstate);
 
+
+      //old If statement Based code
+      //if(customKeypad.key[i].kchar == '+'){
+      //  Serial.println("Sending + to Home Assistant");
+      //  //HAToggle_event("input_boolean", "input_boolean.helperswitch");
+      //  HAToggle_Denon_Up_cb();
+      //}
+      //else if (customKeypad.key[i].kchar == '-'){
+      //  Serial.println("Sending - to Home Assistant");
+      //  HAToggle_Denon_Down_cb();
+      //}
+      //else if (customKeypad.key[i].kchar == 'c'){
+      //  //HAToggle_event("input_boolean", "input_boolean.helperswitch");
+      //  if ((esp_timer_get_time()-lastEvent)>1 * 1000000){ //One Second Timeout.
+      //    lastEvent = esp_timer_get_time();
+      //    ha.setURL("/api/services/switch/toggle");
+      //    ha.sendHAComponent("switch.sonoff_s31_relay");
+      //  } 
+      //}
+      // Send IR codes depending on the current device (tabview page)
+      delay(100);
       //if(currentDevice == 1) IrSender.sendRC5(IrSender.encodeRC5X(0x00, keyMapTechnisat[keyCode/ROWS][keyCode%ROWS]));
       //else if(currentDevice == 2) IrSender.sendSony((keyCode/ROWS)*(keyCode%ROWS), 15);
       //Serial.println("Key Map Technisat" + keyMapTechnisat[keyMapTechnisat[keyCode/ROWS][keyCode%ROWS]]);
-
-      
     }
   }
 
