@@ -18,16 +18,14 @@
 #include <HARestAPI.h>
 #include <ArduinoOTA.h>
 #include <BleGamepad.h>
+#include <wifiCredentials.h>
 
 //#define OTA_Update // Comment out to disable OTA updates
 #define ENABLE_WIFI // Comment out to diable connected features
 #define IREnable // Comment out to diable IR features
 #define BTKeypad //comment out to disable BTKeypad
 
-
-
 // Pin assignment -----------------------------------------------------------------------------------------------------------------------
-
 #define LCD_DC 9 // defined in TFT_eSPI User_Setup.h
 #define LCD_CS 5
 #define LCD_MOSI 23
@@ -139,8 +137,8 @@ byte wakeup_reason;
 enum Wakeup_reasons{WAKEUP_BY_RESET, WAKEUP_BY_IMU, WAKEUP_BY_KEYPAD};
 Preferences preferences;
 
-#define WIFI_SSID "553E"
-#define WIFI_PASSWORD "Steelpanther"
+#define WIFI_SSID WIFI_SSID_SECRET
+#define WIFI_PASSWORD WIFI_PASSWD_SECRET
 #define MQTT_SERVER "192.168.1.10"
 lv_obj_t* WifiLabel;
 WiFiClient espClient;
@@ -149,7 +147,8 @@ HARestAPI ha(espClient);
 
 #ifdef BTKeypad
   //create bluetooth gamepad
-  BleGamepad bleGamepad;
+  //BleGamepad bleGamepad;
+  BleGamepad bleGamepad("Omote", "Blake", battery_percentage);
 #endif
 
 // Helper Functions -----------------------------------------------------------------------------------------------------------------------
@@ -861,10 +860,6 @@ void setup() {
   lv_label_set_text(WifiLabel, "");
   lv_obj_align(WifiLabel, LV_ALIGN_LEFT_MID, -8, 0);
   lv_obj_set_style_text_font(WifiLabel, &lv_font_montserrat_12, LV_PART_MAIN);
-
-
-
-  
 
   objBattPercentage = lv_label_create(statusbar);
   lv_label_set_text(objBattPercentage, "");
