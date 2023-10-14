@@ -209,32 +209,73 @@ static void HAToggle_event(String deviceType, String targetDevice){
 static void HAToggle_Denon_Up_cb(){
   ha.setURL("/api/services/script/VolumeUp");
   ha.sendHA();
+  delay(250);
 }
 
 // Smart Home Denon Volume Up
 static void HAToggle_Denon_Down_cb(){
   ha.setURL("/api/services/script/VolumeDown");
   ha.sendHA();
+  delay(250);
 }
 
 static void keyPadPress(char key, KeyState state) {
   switch (key) {
     case '+': 
-      Serial.println("Sending + to Home Assistant");
+      //Serial.println("Sending + to Home Assistant");
       HAToggle_Denon_Up_cb();
       break;
     case '-': 
-      Serial.println("Sending - to Home Assistant");
+      //Serial.println("Sending - to Home Assistant");
       HAToggle_Denon_Down_cb();
       break;
     case 'u': 
-      Serial.println("Sending UP through Bluetooth");
-      // Up
-      #ifdef BTKeypad
+      //Serial.println("Sending UP through Bluetooth");
       bleGamepad.setHat1(HAT_UP);
       delay( 5 );
       bleGamepad.setHat1(HAT_CENTERED);
-      #endif
+      break;
+    case 'd': 
+      //Serial.println("Sending Down through Bluetooth");
+      bleGamepad.setHat1(HAT_DOWN);
+      delay( 5 );
+      bleGamepad.setHat1(HAT_CENTERED);
+      break;
+    case 'l': 
+      //Serial.println("Sending Left through Bluetooth");
+      bleGamepad.setHat1(HAT_LEFT);
+      delay( 5 );
+      bleGamepad.setHat1(HAT_CENTERED);
+      break;
+    case 'r': 
+      //Serial.println("Sending Right through Bluetooth");
+      bleGamepad.setHat1(HAT_RIGHT);
+      delay( 5 );
+      bleGamepad.setHat1(HAT_CENTERED);
+      break;
+    case 'k': 
+      //Serial.println("Sending Select through Bluetooth");
+      bleGamepad.press(BUTTON_1);
+      delay( 5 );
+      bleGamepad.release(BUTTON_1);
+      break;
+    case 'c': 
+      //Serial.println("Sending Menu through Bluetooth");
+      bleGamepad.press(BUTTON_11);
+      delay( 5 );
+      bleGamepad.release(BUTTON_11);
+      break;
+    case 'b': 
+      //Serial.println("Sending Back through Bluetooth");
+      bleGamepad.pressBack();
+      delay( 5 );
+      bleGamepad.releaseBack();
+      break;
+    case 'f': 
+      //Serial.println("Sending Home through Bluetooth");
+      bleGamepad.pressHome();
+      delay( 5 );
+      bleGamepad.releaseHome();
       break;
     default:
       break;

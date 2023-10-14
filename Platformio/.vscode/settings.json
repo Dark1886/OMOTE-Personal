@@ -2,7 +2,13 @@
     "cmake.configureOnOpen": false,
     "files.associations": {
         "random": "cpp",
-        "array": "cpp"
+        "array": "cpp",
+        "functional": "cpp",
+        "istream": "cpp",
+        "ostream": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp"
     },
     "cmake.sourceDirectory": "${workspaceFolder}/.pio/libdeps/esp32/Adafruit BusIO"
 }
