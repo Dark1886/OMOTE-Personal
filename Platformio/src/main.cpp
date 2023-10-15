@@ -22,7 +22,7 @@
 #include <wifiCredentials.h>
 
 #define ENABLE_WIFI // Comment out to diable connected features
-#define IREnable // Comment out to diable IR features
+//#define IREnable // Comment out to diable IR features
 #define BTKeypad //comment out to disable BTKeypad
 
 // Pin assignment -----------------------------------------------------------------------------------------------------------------------
@@ -220,6 +220,9 @@ static void HAToggle_Denon_Down_cb(){
 }
 
 static void keyPadPress(char key, KeyState state) {
+  if(!bleKeyboard.isConnected()) {
+  Serial.println("BLUETOOTH CONNECTION NOT CONNECTED");
+  }
   switch (key) {
     case '+': 
       //Serial.println("Sending + to Home Assistant");
