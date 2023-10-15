@@ -17,10 +17,10 @@
 #include <PubSubClient.h>
 #include <HARestAPI.h>
 #include <ArduinoOTA.h>
-#include <BleGamepad.h>
+//#include <BleGamepad.h>
+#include <BleKeyboard.h>
 #include <wifiCredentials.h>
 
-//#define OTA_Update // Comment out to disable OTA updates
 #define ENABLE_WIFI // Comment out to diable connected features
 #define IREnable // Comment out to diable IR features
 #define BTKeypad //comment out to disable BTKeypad
@@ -148,7 +148,7 @@ HARestAPI ha(espClient);
 #ifdef BTKeypad
   //create bluetooth gamepad
   //BleGamepad bleGamepad;
-  BleGamepad bleGamepad("Omote", "Blake", battery_percentage);
+  BleKeyboard bleKeyboard("Omote-Keypad", "Blake", battery_percentage);
 #endif
 
 // Helper Functions -----------------------------------------------------------------------------------------------------------------------
@@ -231,52 +231,44 @@ static void keyPadPress(char key, KeyState state) {
       break;
     case 'u': 
       //Serial.println("Sending UP through Bluetooth");
-      bleGamepad.setHat1(HAT_UP);
-      delay( 5 );
-      bleGamepad.setHat1(HAT_CENTERED);
+      bleKeyboard.write(KEY_UP_ARROW);
       break;
     case 'd': 
       //Serial.println("Sending Down through Bluetooth");
-      bleGamepad.setHat1(HAT_DOWN);
-      delay( 5 );
-      bleGamepad.setHat1(HAT_CENTERED);
+      bleKeyboard.write(KEY_DOWN_ARROW);
       break;
     case 'l': 
       //Serial.println("Sending Left through Bluetooth");
-      bleGamepad.setHat1(HAT_LEFT);
-      delay( 5 );
-      bleGamepad.setHat1(HAT_CENTERED);
+      bleKeyboard.write(KEY_LEFT_ARROW);
       break;
     case 'r': 
       //Serial.println("Sending Right through Bluetooth");
-      bleGamepad.setHat1(HAT_RIGHT);
-      delay( 5 );
-      bleGamepad.setHat1(HAT_CENTERED);
+      bleKeyboard.write(KEY_RIGHT_ARROW);
       break;
     case 'k': 
       //Serial.println("Sending Select through Bluetooth");
-      bleGamepad.press(BUTTON_1);
-      delay( 5 );
-      bleGamepad.release(BUTTON_1);
+      bleKeyboard.write(KEY_RETURN);
       break;
+    /*
     case 'c': 
       //Serial.println("Sending Menu through Bluetooth");
       bleGamepad.press(BUTTON_11);
-      delay( 5 );
+      delay( 5 ); 
       bleGamepad.release(BUTTON_11);
       break;
+      */
     case 'b': 
       //Serial.println("Sending Back through Bluetooth");
-      bleGamepad.pressBack();
-      delay( 5 );
-      bleGamepad.releaseBack();
+      bleKeyboard.write(KEY_ESC);
       break;
+    /*
     case 'f': 
       //Serial.println("Sending Home through Bluetooth");
       bleGamepad.pressHome();
       delay( 5 );
       bleGamepad.releaseHome();
       break;
+      */
     default:
       break;
     }
@@ -977,17 +969,7 @@ void setup() {
   #endif
 
   #ifdef BTKeypad
-    //setup Bluetooth ability
-    BleGamepadConfiguration bleGamepadConfig;
-    bleGamepadConfig.setAutoReport(true);
-    bleGamepadConfig.setControllerType(CONTROLLER_TYPE_GAMEPAD);
-    bleGamepadConfig.setIncludeStart(true);
-    bleGamepadConfig.setIncludeSelect(true);
-    bleGamepadConfig.setIncludeMenu(true);
-    bleGamepadConfig.setIncludeHome(true);
-    bleGamepadConfig.setIncludeBack(true);
-
-    bleGamepad.begin(&bleGamepadConfig);
+    bleKeyboard.begin();
   #endif
   Serial.print("Setup finised in ");
   Serial.print(millis());
@@ -1062,39 +1044,8 @@ void loop() {
       Serial.println(customKeypad.key[i].kstate);
       keyPadPress(customKeypad.key[i].kchar, customKeypad.key[i].kstate);
 
-
-      //old If statement Based code
-      //if(customKeypad.key[i].kchar == '+'){
-      //  Serial.println("Sending + to Home Assistant");
-      //  //HAToggle_event("input_boolean", "input_boolean.helperswitch");
-      //  HAToggle_Denon_Up_cb();
-      //}
-      //else if (customKeypad.key[i].kchar == '-'){
-      //  Serial.println("Sending - to Home Assistant");
-      //  HAToggle_Denon_Down_cb();
-      //}
-      //else if (customKeypad.key[i].kchar == 'c'){
-      //  //HAToggle_event("input_boolean", "input_boolean.helperswitch");
-      //  if ((esp_timer_get_time()-lastEvent)>1 * 1000000){ //One Second Timeout.
-      //    lastEvent = esp_timer_get_time();
-      //    ha.setURL("/api/services/switch/toggle");
-      //    ha.sendHAComponent("switch.sonoff_s31_relay");
-      //  } 
-      //}
-      // Send IR codes depending on the current device (tabview page)
       delay(100);
-      //if(currentDevice == 1) IrSender.sendRC5(IrSender.encodeRC5X(0x00, keyMapTechnisat[keyCode/ROWS][keyCode%ROWS]));
-      //else if(currentDevice == 2) IrSender.sendSony((keyCode/ROWS)*(keyCode%ROWS), 15);
-      //Serial.println("Key Map Technisat" + keyMapTechnisat[keyMapTechnisat[keyCode/ROWS][keyCode%ROWS]]);
+
     }
   }
-
-  // IR Test
-  //tft.drawString("IR Command: ", 10, 90, 1);
-  //decode_results results;
-  //if (IrReceiver.decode(&results)) {
-  //  //tft.drawString(String(results.command) + "        ", 80, 90, 1);
-  //  IrReceiver.resume(); // Enable receiving of the next value
-  //}
-
 }
