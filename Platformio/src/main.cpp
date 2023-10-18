@@ -6,24 +6,35 @@
 #include <Preferences.h>
 #include "SparkFunLIS3DH.h"
 #include "Wire.h"
-#include <IRremoteESP8266.h>
-#include <IRsend.h>
-#include <IRrecv.h>
-#include <IRutils.h>
+
+#ifdef IREnable
+  #include <IRremoteESP8266.h>
+  #include <IRsend.h>
+  #include <IRrecv.h>
+  #include <IRutils.h>
+#endif
+
 #include <lvgl.h>
 #include "WiFi.h"
 #include <Adafruit_FT6206.h>
 #include "driver/ledc.h"
-#include <PubSubClient.h>
-#include <HARestAPI.h>
-#include <ArduinoOTA.h>
-//#include <BleGamepad.h>
+
+#ifdef MqttEnable
+  #include <PubSubClient.h>
+#endif
+
+#ifdef HA_integration 
+  #include <HARestAPI.h>
+#endif
+#ifdef OTA_Update
+  #include <ArduinoOTA.h>
+#endif
+
 #include <BleKeyboard.h>
 #include <wifiCredentials.h>
 
 #define ENABLE_WIFI // Comment out to diable connected features
-//#define IREnable // Comment out to diable IR features
-#define BTKeypad //comment out to disable BTKeypad
+
 
 // Pin assignment -----------------------------------------------------------------------------------------------------------------------
 #define LCD_DC 9 // defined in TFT_eSPI User_Setup.h
@@ -142,8 +153,12 @@ Preferences preferences;
 #define MQTT_SERVER "192.168.1.10"
 lv_obj_t* WifiLabel;
 WiFiClient espClient;
-PubSubClient client(espClient);
-HARestAPI ha(espClient);
+#ifdef MqttEnable
+  PubSubClient client(espClient);
+#endif
+#ifdef HA_integration
+  HARestAPI ha(espClient);
+#endif
 
 #ifdef BTKeypad
   //create bluetooth gamepad
@@ -196,9 +211,12 @@ static void smartHomeToggle_event_cb(lv_event_t * e){
   if(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED)) strcpy(payload,"on");
   else strcpy(payload,"off");
   // Publish an MQTT message based on the event user data  
+  #ifdef MqttEnable
   client.publish("cmnd/tasmota_S31/Power1", payload);
+  #endif
 }
 
+#ifdef HA_integration
 // Smart Home Toggle Event handler
 static void HAToggle_event(String deviceType, String targetDevice){
   ha.setURL("/api/services/" + deviceType + "/toggle");
@@ -218,6 +236,7 @@ static void HAToggle_Denon_Down_cb(){
   ha.sendHA();
   delay(250);
 }
+#endif
 
 static void keyPadPress(char key, KeyState state) {
   if(!bleKeyboard.isConnected()) {
@@ -225,12 +244,16 @@ static void keyPadPress(char key, KeyState state) {
   }
   switch (key) {
     case '+': 
+      #ifdef HA_integration
       //Serial.println("Sending + to Home Assistant");
       HAToggle_Denon_Up_cb();
+      #endif
       break;
     case '-': 
+      #ifdef HA_integration
       //Serial.println("Sending - to Home Assistant");
       HAToggle_Denon_Down_cb();
+      #endif
       break;
     case 'u': 
       //Serial.println("Sending UP through Bluetooth");
@@ -282,8 +305,10 @@ static void smartHomeSlider_event_cb(lv_event_t * e){
   char payload[8];
   dtostrf(lv_slider_get_value(slider), 1, 2, payload);
   // Publish an MQTT message based on the event user data
+  #ifdef MqttEnable
   if((int)e->user_data == 1) client.publish("bulb1_setbrightness", payload);
   if((int)e->user_data == 2) client.publish("bulb2_setbrightness", payload);
+  #endif
 }
 
 // Display flushing
@@ -471,8 +496,10 @@ void enterSleep(){
 void WiFiEvent(WiFiEvent_t event){
   //Serial.printf("[WiFi-event] event: %d\n", event);
   if(event == ARDUINO_EVENT_WIFI_STA_GOT_IP){
+    #ifdef MqttEnable
     client.setServer(MQTT_SERVER, 1883); // MQTT initialization
     client.connect("OMOTE"); // Connect using a client id
+    #endif
   }
   // Set status bar icon based on WiFi status
   if(event == ARDUINO_EVENT_WIFI_STA_GOT_IP || event == ARDUINO_EVENT_WIFI_STA_GOT_IP6){
@@ -577,6 +604,7 @@ void setup() {
     currentDevice = preferences.getUChar("currentDevice");
   }  
 
+  
   // Setup TFT 
 
   // Slowly charge the VSW voltage to prevent a brownout
@@ -598,6 +626,7 @@ void setup() {
   Wire.begin(SDA, SCL, 400000); // Configure i2c pins and set frequency to 400kHz
   touch.begin(128); // Initialize touchscreen and set sensitivity threshold
 
+  #ifdef HA_integration
   //setup HARestAPI
   const char* ha_ip = "192.168.1.10";
   uint16_t ha_port = 8123;
@@ -605,6 +634,7 @@ void setup() {
   const char* ha_pwd = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1NzMzNzBhYWQ2MDc0MjEyOWE3YjgyOGFjYjRkNThkYSIsImlhdCI6MTY5NTE2NjA3MywiZXhwIjoyMDEwNTI2MDczfQ.I-8vMjTcoObMHyx4Y0y1TNEh9JIIvlmFlR8Xt5FyGUo"; 
   ha.setHAServer(ha_ip, ha_port);
   ha.setHAPassword(ha_pwd);
+  #endif
 
   // Setup LVGL
   lv_init();
@@ -796,7 +826,7 @@ void setup() {
   lv_obj_align(bulbIcon, LV_ALIGN_TOP_LEFT, 0, 0);
 
   menuLabel = lv_label_create(menuBox);
-  lv_label_set_text(menuLabel, "TBD");
+  lv_label_set_text(menuLabel, "Test");
   lv_obj_align(menuLabel, LV_ALIGN_TOP_LEFT, 22, 3);
   lv_obj_t* lightToggleB = lv_switch_create(menuBox);
   lv_obj_set_size(lightToggleB, 40, 22);
