@@ -275,14 +275,14 @@ static void keyPadPress(char key, KeyState state) {
       //Serial.println("Sending Select through Bluetooth");
       bleKeyboard.write(KEY_RETURN);
       break;
-    /*
+    
     case 'c': 
       //Serial.println("Sending Menu through Bluetooth");
-      bleGamepad.press(BUTTON_11);
-      delay( 5 ); 
-      bleGamepad.release(BUTTON_11);
-      break;
-      */
+      bleKeyboard.press(KEY_LEFT_CTRL);
+      bleKeyboard.press(KEY_ESC);
+      delay(100);
+      bleKeyboard.releaseAll();
+    /*
     case 'b': 
       //Serial.println("Sending Back through Bluetooth");
       bleKeyboard.write(KEY_ESC);
@@ -295,6 +295,13 @@ static void keyPadPress(char key, KeyState state) {
       bleGamepad.releaseHome();
       break;
       */
+    case '=': 
+      //Serial.println("Sending Back through Bluetooth");
+      bleKeyboard.press(KEY_LEFT_ALT);
+      bleKeyboard.press(KEY_ESC);
+      delay(100);
+      bleKeyboard.releaseAll();
+      break;
     default:
       break;
     }
