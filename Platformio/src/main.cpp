@@ -117,7 +117,7 @@ const byte ROWS = 5; //four rows
 const byte COLS = 5; //four columns
 //define the symbols on the buttons of the keypads
 char hexaKeys[ROWS][COLS] = {
-  {'s','^','-','m','r'}, //  source, channel+, Volume-,   mute, record
+  {'s','^','-','m','f'}, //  source, channel+, Volume-,   mute, record
   {'i','r','+','k','d'}, //    info,    right, Volume+,     OK,   down
   {'4','v','1','3','2'}, //    blue, channel-,     red, yellow,  green
   {'>','o','b','u','l'}, // forward,      off,    back,     up,   left
@@ -163,7 +163,7 @@ WiFiClient espClient;
 #ifdef BTKeypad
   //create bluetooth gamepad
   //BleGamepad bleGamepad;
-  BleKeyboard bleKeyboard("Omote-Keypad", "Blake", battery_percentage);
+  BleKeyboard bleKeyboard("Omote", "Blake", battery_percentage);
 #endif
 
 // Helper Functions -----------------------------------------------------------------------------------------------------------------------
@@ -275,18 +275,14 @@ static void keyPadPress(char key, KeyState state) {
       //Serial.println("Sending Select through Bluetooth");
       bleKeyboard.write(KEY_RETURN);
       break;
-    
-    case 'c': 
-      //Serial.println("Sending Menu through Bluetooth");
-      bleKeyboard.press(KEY_LEFT_CTRL);
-      bleKeyboard.press(KEY_ESC);
-      delay(100);
-      bleKeyboard.releaseAll();
-    /*
+    case 'f': 
+      //Serial.println("Sending Back through Bluetooth");
+      bleKeyboard.write(KEY_MEDIA_WWW_HOME);
+      break; 
     case 'b': 
       //Serial.println("Sending Back through Bluetooth");
-      bleKeyboard.write(KEY_ESC);
-      break;
+      bleKeyboard.write(KEY_MEDIA_WWW_BACK);
+      break;  
     /*
     case 'f': 
       //Serial.println("Sending Home through Bluetooth");
@@ -295,13 +291,6 @@ static void keyPadPress(char key, KeyState state) {
       bleGamepad.releaseHome();
       break;
       */
-    case '=': 
-      //Serial.println("Sending Back through Bluetooth");
-      bleKeyboard.press(KEY_LEFT_ALT);
-      bleKeyboard.press(KEY_ESC);
-      delay(100);
-      bleKeyboard.releaseAll();
-      break;
     default:
       break;
     }
